@@ -4,10 +4,10 @@
     #include <stdint.h>
     #include "mmu.h"
 
-    #define FLAG_Z  ((uint8_t) 0x80) // Zero Flag
-    #define FLAG_N  ((uint8_t) 0x40) // Subtract Flag
-    #define FLAG_H  ((uint8_t) 0x20) // Half Carry Flag
-    #define FLAG_C  ((uint8_t) 0x10) // Carry Flag
+    #define FLAG_Z  (1 << 7) // Zero Flag
+    #define FLAG_N  (1 << 6) // Subtract Flag
+    #define FLAG_H  (1 << 5) // Half Carry Flag
+    #define FLAG_C  (1 << 4) // Carry Flag
 
 typedef struct 
 {
