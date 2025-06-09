@@ -1818,9 +1818,67 @@ int cpuStep(CPU *cpu, MMU *mmu)
         }
         case 0xC9: // RET
         {
-            
+            uint8_t low = popByte(cpu, mmu);
+            uint8_t high = popByte(cpu, mmu);
+            cpu->pc = (high << 8) | low;
+            cycles = 4;
+            break;
         }
-        
+        case 0xCA: // JP Z, a16
+        {
+            uint16_t addr = fetchWord(mmu, cpu->pc);
+            if(cpu->f & FLAG_Z) {
+                cpu->pc = addr;
+                cycles = 4;
+            } else
+                cycles = 3;
+        }
+        case 0xCC: // CALL Z, a16
+        {
+            uint16_t target = fetchWord(mmu, cpu->pc);
+            if(cpu->f & FLAG_Z) 
+            {
+                pushByte(cpu, mmu, (cpu->pc >> 8)); // Push high byte of PC
+                pushByte(cpu, mmu, (cpu->pc & 0xFF)); // Push low byte of PC
+                cpu->pc = target; // Jump to address
+                cycles = 6;
+            } else 
+                cycles = 3;
+            break;
+        }
+        case 0xCD: // CALL a16
+        {
+            uint16_t target = fetchWord(mmu, cpu->pc);
+            pushByte(cpu, mmu, (cpu->pc >> 8)); // Push high byte of PC
+            pushByte(cpu, mmu, (cpu->pc & 0xFF)); // Push low byte of PC
+            cpu->pc = target; // Jump to address
+            cycles = 6;
+            break;
+        }
+        case 0xCE: // ADC A, d8
+        {
+            uint8_t value = fetchByte(mmu, cpu->pc);
+            uint8_t carry = (cpu->f & FLAG_C) ? 1 : 0;
+
+            uint8_t halfSum = (cpu->a & 0x0F) + (value & 0x0F) + carry;
+            uint8_t result = cpu->a + value + carry;
+            
+            cpu->a = result;
+            setFlags(cpu, FLAG_Z, cpu->a == 0);
+            setFlags(cpu, FLAG_N, 0);
+            setFlags(cpu, FLAG_H, halfSum > 0x0F);
+            setFlags(cpu, FLAG_C, result > 0xFF);
+            cycles = 2;
+            break;
+        }
+        case 0xCF: // RST 1
+        {
+            pushByte(cpu, mmu, (cpu->pc >> 8)); // Push high byte of PC
+            pushByte(cpu, mmu, (cpu->pc & 0xFF)); // Push low byte of PC
+            cpu->pc = 0x08; // Jump to address 0x08
+            cycles = 4;
+            break;
+        }
     }
 
     return cycles;
