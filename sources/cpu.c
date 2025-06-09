@@ -33,6 +33,12 @@ static uint8_t popByte(CPU *cpu, MMU *mmu)
     return mmuReadByte(mmu, addr);
 }
 
+static void pushByte(CPU *cpu, MMU *mmu, uint8_t value)
+{
+    cpu->sp--;
+    mmuWriteByte(mmu, cpu->sp, value);
+}
+
 void cpuReset(CPU *cpu)
 {
     LOG("Resetting CPU...");
@@ -1733,6 +1739,88 @@ int cpuStep(CPU *cpu, MMU *mmu)
             cycles = 3;
             break;
         }
+        case 0xC2: // JP NZ, a16
+        {
+            if((cpu->f & FLAG_Z) == 0) {
+                uint8_t low = mmuReadByte(mmu, cpu->pc);
+                uint8_t high = mmuReadByte(mmu, cpu->pc + 1);
+                cpu->pc = (high << 8) | low;
+                cycles = 4;
+            } else {
+                cpu->pc += 2; // Skip address
+                cycles = 3;
+            }
+            break;
+        }
+        case 0xC3: // JP a16
+        {
+            uint8_t low = mmuReadByte(mmu, cpu->pc);
+            uint8_t high = mmuReadByte(mmu, cpu->pc + 1);
+            cpu->pc = (high << 8) | low;
+            cycles = 4;
+            break;
+        }
+        case 0xC4: // CALL NZ, a16
+        {
+            uint8_t low = mmuReadByte(mmu, cpu->pc);
+            uint8_t high = mmuReadByte(mmu, cpu->pc + 1);
+            uint16_t address = (high << 8) | low;
+
+            if((cpu->f & FLAG_Z) == 0) {
+                pushWord(cpu, mmu, cpu->pc + 2); // Push return address
+                cpu->pc = address; // Jump to address
+                cycles = 6;
+            } else {
+                cpu->pc += 2; // Skip address
+                cycles = 3;
+            }
+            break;
+        }
+        case 0xC5: // PUSH BC
+        {
+            pushByte(cpu, mmu, cpu->b);
+            pushByte(cpu, mmu, cpu->c);
+            cycles = 4;
+            break;
+        }
+        case 0xC6: // ADD A, d8
+        {
+            uint8_t value = mmuReadByte(mmu, cpu->pc);
+            cpu->pc++;
+            uint8_t result = cpu->a + value;
+            cpu->f = (uint8_t)~(FLAG_Z | FLAG_N | FLAG_H);
+
+            setFlags(cpu, FLAG_Z, result == 0);
+            setFlags(cpu, FLAG_H, ((cpu->a & 0x0F) + (value & 0x0F)) > 0x0F);
+            setFlags(cpu, FLAG_C, result < cpu->a); // Check for carry
+            cpu->a = result;
+            cycles = 2;
+            break;
+        }
+        case 0xC7: // RST 0
+        {
+            pushByte(cpu, mmu, (cpu->pc >> 8)); // Push high byte of PC
+            pushByte(cpu, mmu, (cpu->pc & 0xFF)); // Push low byte of PC
+            cpu->pc = 0x00; // Jump to address 0x00
+            cycles = 4;
+            break;
+        }
+        case 0xC8: // RET Z
+        {
+            if((cpu->f & FLAG_Z) != 0) {
+                uint8_t low = popByte(cpu, mmu);
+                uint8_t high = popByte(cpu, mmu);
+                cpu->pc = (high << 8) | low;
+                cycles = 5;
+            } else 
+                cycles = 2;
+            break;
+        }
+        case 0xC9: // RET
+        {
+            
+        }
+        
     }
 
     return cycles;
